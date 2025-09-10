@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Invitación Interactiva</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: #111;
+      width: 100vw; height: 100vh;
+      overflow: hidden;
+      touch-action: manipulation;
+    }
+    #video-container {
+      position: fixed;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+      background: #111;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+    video {
+      max-width: 100vw;
+      max-height: 100vh;
+      width: auto;
+      height: auto;
+      background: #111;
+      display: block;
+      position: relative;
+      /* Cambiamos object-fit a "contain" para mostrar el video completo */
+      object-fit: contain;
+      box-shadow: 0 0 28px 0 #0008;
+    }
+    .side-btn {
+      display: none;
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 70px; height: 70px;
+      background: rgba(255,255,255,0.85);
+      border: none;
+      border-radius: 50%;
+      font-size: 2.7em;
+      color: #333;
+      z-index: 20;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+      cursor: pointer;
+      user-select: none;
+    }
+    #btn-left { left: 18px; }
+    #btn-right { right: 18px; }
+    .side-btn:active { background: #fff; }
+    .side-btn:focus { outline: 3px solid #79b4ee; }
+    #overlay-blocker {
+      position: fixed;
+      inset: 0;
+      z-index: 100;
+      background: #111;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.15s;
+    }
+  </style>
+</head>
+<body>
+  <div id="video-container">
+    <video id="video" playsinline preload="auto" webkit-playsinline muted></video>
+    <button id="btn-left" class="side-btn">&#8592;</button>
+    <button id="btn-right" class="side-btn">&#8594;</button>
+    <div id="overlay-blocker"></div>
+  </div>
+  <script>
+    // --- Configuración de clips ---
+    const clips = [
+      "clip1.mp4", // 0
+      "clip2.mp4", // 1
+      "clip3.mp4", // 2
+      "clip4.mp4", // 3
+      "clip5.mp4", // 4
+      "clip6.mp4", // 5
+      "clip7.mp4", // 6
+      "clip8.mp4", // 7
+    ];
+
+    // --- Estado ---
+    let state = {
+      step: 0,
+      rightClicks: 0,
+      fase: "main", // main, clip6, clip7, clip8, ciclo4, ciclo7
+      lockClicks: false,
+      currentClip: 0,
+      started: false,
+      waitingClick: false
+    };
+
+    const video = document.getElementById('video');
+    const btnLeft = document.getElementById('btn-left');
+    const btnRight = document.getElementById('btn-right');
+    const overlay = document.getElementById('overlay-blocker');
+
+    function showOverlay() {
+      overlay.style.opacity = "1";
+      overlay.style.pointerEvents = "auto";
+    }
+    function hideOverlay() {
+      overlay.style.opacity = "0";
+      overlay.style.pointerEvents = "none";
+    }
+
+    function playClip(n, callback) {
+      showOverlay();
+      state.currentClip = n;
+      video.pause();
+      video.onended = null;
+      video.src = `videos/${clips[n]}`;
+      video.load();
+      video.currentTime = 0;
+      video.oncanplay = () => {
+        video.play().catch(()=>{});
+        hideOverlay();
+        video.oncanplay = null;
+      };
+      video.onended = callback || null;
+      video.controls = false;
+      video.style.pointerEvents = 'none';
+    }
+
+    function hideButtons() {
+      btnLeft.style.display = "none";
+      btnRight.style.display = "none";
+    }
+    function showButtons() {
+      btnLeft.style.display = "block";
+      btnRight.style.display = "block";
+    }
+    function reset() {
+      state = { step: 0, rightClicks: 0, fase: "main", lockClicks: false, currentClip: 0, started: false, waitingClick: false };
+      hideButtons();
+      showOverlay();
+
+      setTimeout(() => {
+        playClip(0, () => {});
+        state.step = 1;
+        state.started = true;
+        state.waitingClick = true;
+      }, 1000);
+    }
+
+    function handleStartClick(e) {
+      if(state.lockClicks) return;
+      if(state.step === 1 && state.started && state.waitingClick) {
+        state.lockClicks = true;
+        state.waitingClick = false;
+        playClip(1, () => {
+          showButtons();
+          state.step = 2;
+          state.lockClicks = false;
+        });
+        state.step = 1.5;
+      }
+    }
+    document.getElementById('video-container').addEventListener('pointerdown', handleStartClick);
+
+    btnRight.addEventListener('click', () => {
+      if(state.lockClicks) return;
+      state.lockClicks = true;
+      if(state.step === 2 && state.fase === "main") {
+        if(state.rightClicks === 0) {
+          playClip(2, () => { state.lockClicks = false; });
+          state.rightClicks = 1;
+        } else if(state.rightClicks === 1) {
+          playClip(3, () => { state.lockClicks = false; });
+          state.rightClicks = 2;
+        } else if(state.rightClicks === 2) {
+          playClip(4, () => { state.lockClicks = false; });
+          state.rightClicks = 3;
+        }
+      }
+      else if(state.fase === "main" && state.rightClicks === 3 && state.currentClip === 4) {
+        state.lockClicks = false;
+      }
+      else if(state.fase === "clip6" && state.currentClip === 5) {
+        playClip(4, () => { state.lockClicks = false; });
+        state.fase = "main";
+        state.currentClip = 4;
+      }
+      else if(state.fase === "clip7" && state.currentClip === 6) {
+        playClip(7, () => { state.lockClicks = false; });
+        state.fase = "clip8";
+        state.currentClip = 7;
+      }
+      else if(state.fase === "clip8" && state.currentClip === 7) {
+        playClip(3, () => { state.lockClicks = false; });
+        state.fase = "ciclo4";
+        state.currentClip = 3;
+      }
+      else if(state.fase === "ciclo4" && state.currentClip === 3) {
+        playClip(4, () => { state.lockClicks = false; });
+        state.fase = "main";
+        state.currentClip = 4;
+      }
+      else if(state.fase === "ciclo7" && state.currentClip === 6) {
+        playClip(7, () => { state.lockClicks = false; });
+        state.fase = "clip8";
+        state.currentClip = 7;
+      }
+      else {
+        state.lockClicks = false;
+      }
+    });
+
+    btnLeft.addEventListener('click', () => {
+      if(state.lockClicks) return;
+      state.lockClicks = true;
+      if(state.fase === "main" && state.rightClicks === 3 && state.currentClip === 4) {
+        playClip(5, () => { state.lockClicks = false; });
+        state.fase = "clip6";
+        state.currentClip = 5;
+      }
+      else if(state.fase === "clip6" && state.currentClip === 5) {
+        playClip(6, () => { state.lockClicks = false; });
+        state.fase = "clip7";
+        state.currentClip = 6;
+      }
+      else if(state.fase === "clip7" && state.currentClip === 6) {
+        playClip(7, () => { state.lockClicks = false; });
+        state.fase = "clip8";
+        state.currentClip = 7;
+      }
+      else if(state.fase === "ciclo4" && state.currentClip === 3) {
+        playClip(6, () => { state.lockClicks = false; });
+        state.fase = "ciclo7";
+        state.currentClip = 6;
+      }
+      else if(state.fase === "ciclo7" && state.currentClip === 6) {
+        playClip(7, () => { state.lockClicks = false; });
+        state.fase = "clip8";
+        state.currentClip = 7;
+      }
+      else {
+        state.lockClicks = false;
+      }
+    });
+
+    video.addEventListener('play', () => { state.lockClicks = false; });
+
+    btnLeft.addEventListener('pointerdown', e => { e.preventDefault(); });
+    btnRight.addEventListener('pointerdown', e => { e.preventDefault(); });
+
+    document.body.addEventListener('touchmove', e=>{ e.preventDefault(); }, { passive:false });
+
+    window.onload = reset;
+    btnLeft.addEventListener('touchstart', e => e.preventDefault());
+    btnRight.addEventListener('touchstart', e => e.preventDefault());
+  </script>
+</body>
+</html>
